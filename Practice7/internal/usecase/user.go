@@ -2,14 +2,10 @@ package usecase
 
 import (
 	"fmt"
-	"net/http"
 	"practice7/internal/entity"
-	"practice7/internal/usecase"
 	"practice7/internal/usecase/repo"
 	"practice7/utils"
-	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -23,52 +19,16 @@ func NewUserUseCase(r *repo.UserRepo) *UserUseCase {
 	}
 }
 
-func (r *UserRoutes) RegisterUser(c *gin.Context) {
-	var createUserDTO entity.CreateUserDTO
-
-	if err := c.ShouldBindJSON(&createUserDTO); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	hashedPassword, err := utils.HashPassword(createUserDTO.Password)
+func (u *UserUseCase) RegisterUser(user *entity.User) (*entity.User, string, error) {
+	user, err := u.repo.RegisterUser(user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "error hashing password"})
-		return
+		return nil, "", fmt.Errorf("register user: %w", err)
 	}
 
-	role := createUserDTO.Role
-	if role == "" {
-		role = "user"
-	}
-
-	user := entity.User{
-		ID:       uuid.New(),
-		Username: createUserDTO.Username,
-		Email:    createUserDTO.Email,
-		Password: hashedPassword,
-		Role:     role,
-		Verified: false,
-	}
-
-	createdUser, sessionID, err := r.t.RegisterUser(&user)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{
-		"message":    "user registered successfully",
-		"session_id": sessionID,
-		"user": gin.H{
-			"id":       createdUser.ID,
-			"username": createdUser.Username,
-			"email":    createdUser.Email,
-			"role":     createdUser.Role,
-			"verified": createdUser.Verified,
-		},
-	})
+	sessionID := uuid.New().String()
+	return user, sessionID, nil
 }
+
 func (u *UserUseCase) LoginUser(user *entity.LoginUserDTO) (string, error) {
 	userFromRepo, err := u.repo.LoginUser(user)
 	if err != nil {
